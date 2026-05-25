@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Margem por Cliente — Abril/2026</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="chart.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,"Inter",sans-serif;background:#f5f7fa;color:#1e293b;font-size:14px}
@@ -104,7 +104,9 @@ const cards=[
 ];
 document.getElementById("kpis").innerHTML=cards.map(c=>`<div class="kpi ${c.c}"><div class="v">${c.v}</div><div class="l">${c.l}</div></div>`).join("");
 
-// Top 12 chart
+// Charts (isolados: se Chart.js não carregar, KPIs e tabela ainda populam)
+try{
+if(typeof Chart==="undefined")throw new Error("Chart.js não carregou");
 const top=D.clients.slice(0,12);
 new Chart(document.getElementById("chTop"),{type:"bar",data:{labels:top.map(c=>c.cliente),
  datasets:[
@@ -131,6 +133,7 @@ new Chart(document.getElementById("chTrend"),{data:{labels:D.trend.map(t=>t.mes)
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"top"},
   tooltip:{callbacks:{label:c=>c.dataset.label.includes("%")?c.dataset.label+": "+c.raw.toFixed(1)+"%":c.dataset.label+": "+fmt(c.raw)}}},
   scales:{y:{position:"left",ticks:{callback:v=>(v/1e6)+"M"}},y1:{position:"right",grid:{drawOnChartArea:false},ticks:{callback:v=>v+"%"}}}}});
+}catch(e){console.error("Falha ao renderizar gráficos:",e);}
 
 function setF(b){filter=b.dataset.f;document.querySelectorAll(".fbtn").forEach(x=>x.classList.remove("active"));b.classList.add("active");render();}
 function sortBy(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=-1;}render();}
