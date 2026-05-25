@@ -53,7 +53,7 @@ tr.total td{font-weight:800;background:#f1f5f9;border-top:2px solid #e2e8f0}
     <div class="chart-box"><canvas id="chTop"></canvas></div>
   </div>
   <div class="card">
-    <h2>Faturamento por BU</h2>
+    <h2>Composição do faturamento (RL)</h2>
     <div class="chart-box sm"><canvas id="chBu"></canvas></div>
   </div>
 </div>
@@ -117,11 +117,11 @@ new Chart(document.getElementById("chTop"),{type:"bar",data:{labels:top.map(c=>c
   tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmt(c.raw)}}},
   scales:{y:{ticks:{callback:v=>(v/1e6)+"M"}},x:{ticks:{font:{size:9},maxRotation:60,minRotation:45}}}}});
 
-// BU doughnut
-new Chart(document.getElementById("chBu"),{type:"doughnut",data:{labels:D.bus.map(b=>b.bu),
- datasets:[{data:D.bus.map(b=>b.rl),backgroundColor:["#2563eb","#f59e0b","#10b981","#ef4444"]}]},
+// Composição do faturamento (RL = Custo Direto + Custo Indireto + Margem Indireta)
+new Chart(document.getElementById("chBu"),{type:"doughnut",data:{labels:["Margem Indireta","Custo Direto","Custo Indireto"],
+ datasets:[{data:[k.mi,k.cd,k.ci],backgroundColor:["#22c55e","#94a3b8","#f59e0b"]}]},
  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},
-  tooltip:{callbacks:{label:c=>c.label+": "+fmt(c.raw)}}}}});
+  tooltip:{callbacks:{label:c=>c.label+": "+fmt(c.raw)+" ("+(c.raw/D.kpi.rl*100).toFixed(1)+"%)"}}}}});
 
 // Trend
 new Chart(document.getElementById("chTrend"),{data:{labels:D.trend.map(t=>t.mes),
