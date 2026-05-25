@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Margem por Cliente — Abril/2026</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Inter",sans-serif;background:#f5f7fa;color:#1e293b;font-size:14px}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:24px;font-weight:800;margin-bottom:4px}
+.sub{font-size:12px;color:#94a3b8;margin-bottom:20px}
+.kpis{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:24px}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:16px}
+.kpi .v{font-size:22px;font-weight:800;line-height:1.1}
+.kpi .l{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-top:6px}
+.kpi.ok .v{color:#059669}.kpi.warn .v{color:#d97706}.kpi.bad .v{color:#dc2626}.kpi.blue .v{color:#2563eb}
+.grid2{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;margin-bottom:24px}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}}
+.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px}
+.card h2{font-size:14px;font-weight:700;margin-bottom:14px;color:#334155}
+.chart-box{position:relative;height:340px}
+.chart-box.sm{height:300px}
+.filters{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.filters input{padding:8px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:13px;width:260px;font-family:inherit}
+.filters input:focus{outline:none;border-color:#4f46e5}
+.filters .fbtn{padding:7px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#64748b;font-family:inherit}
+.filters .fbtn:hover{background:#f8fafc}.filters .fbtn.active{background:#4f46e5;color:#fff;border-color:#4f46e5}
+table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0}
+th{background:#f8fafc;text-align:left;padding:10px 14px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;color:#64748b;font-weight:700;cursor:pointer;white-space:nowrap;border-bottom:1px solid #e2e8f0}
+th:hover{color:#4f46e5}
+td{padding:9px 14px;border-bottom:1px solid #f1f5f9;font-size:13px}
+tr:hover{background:#fafbfc}
+tr.neg{background:#fef2f2}tr.neg:hover{background:#fee2e2}
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.cli{font-weight:700;color:#1e293b}
+.pos{color:#059669;font-weight:700}.negv{color:#dc2626;font-weight:700}
+tr.total td{font-weight:800;background:#f1f5f9;border-top:2px solid #e2e8f0}
+.foot{font-size:11px;color:#94a3b8;margin-top:18px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Dashboard de Margem — Mutant / Interaxa</h1>
+<div class="sub" id="sub"></div>
+<div class="kpis" id="kpis"></div>
+
+<div class="grid2">
+  <div class="card">
+    <h2>Top 12 clientes — Faturamento (RL) vs Margem Indireta (MI)</h2>
+    <div class="chart-box"><canvas id="chTop"></canvas></div>
+  </div>
+  <div class="card">
+    <h2>Faturamento por BU</h2>
+    <div class="chart-box sm"><canvas id="chBu"></canvas></div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:24px">
+  <h2>Evolução mensal — Jan a Abr/2026</h2>
+  <div class="chart-box sm"><canvas id="chTrend"></canvas></div>
+</div>
+
+<div class="filters">
+  <input type="text" id="search" placeholder="Buscar cliente..." oninput="render()"/>
+  <button class="fbtn active" data-f="all" onclick="setF(this)">Todos</button>
+  <button class="fbtn" data-f="neg" onclick="setF(this)">Margem negativa</button>
+</div>
+<table>
+  <thead><tr>
+    <th onclick="sortBy('rl')">Cliente</th>
+    <th class="num" onclick="sortBy('rl')">Faturamento RL</th>
+    <th class="num" onclick="sortBy('cd')">Custo Direto</th>
+    <th class="num" onclick="sortBy('mc1')">MC1</th>
+    <th class="num" onclick="sortBy('mc1p')">MC1 %</th>
+    <th class="num" onclick="sortBy('ci')">Custo Indir.</th>
+    <th class="num" onclick="sortBy('mi')">MI</th>
+    <th class="num" onclick="sortBy('mip')">MI %</th>
+  </tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+<div class="foot">Fonte: MARGEM JAN-ABR V3 FULL · RL normalizada (com antecipações) · Mês de referência Abril/2026</div>
+</div>
+
+<script>
+const D = {"ref": "Abril / 2026", "clients": [{"cliente": "CLARO BRASIL", "rl": 3579503.99, "cd": 1109170.35, "mc1": 2470333.64, "ci": 32191.72, "mi": 2438141.92}, {"cliente": "NEOENERGIA", "rl": 1915725.0, "cd": 1117018.63, "mc1": 798706.37, "ci": 936.0, "mi": 797770.37}, {"cliente": "HAPVIDA NDI", "rl": 1508567.24, "cd": 1079060.37, "mc1": 429506.87, "ci": 27084.73, "mi": 402422.15}, {"cliente": "BANCO ITAU", "rl": 1160223.48, "cd": 623418.61, "mc1": 536804.88, "ci": 13062.27, "mi": 523742.61}, {"cliente": "CIELO", "rl": 1096906.84, "cd": 1154000.98, "mc1": -57094.14, "ci": 17581.3, "mi": -74675.44}, {"cliente": "TELEFONICA", "rl": 1071971.04, "cd": 904567.68, "mc1": 167403.36, "ci": 5981.68, "mi": 161421.68}, {"cliente": "KROTON", "rl": 742781.55, "cd": 665198.46, "mc1": 77583.09, "ci": 843.44, "mi": 76739.65}, {"cliente": "PREVENT SENIOR", "rl": 686057.0, "cd": 460735.51, "mc1": 225321.49, "ci": 6918.04, "mi": 218403.45}, {"cliente": "EUROP ASSISTANCE", "rl": 673049.99, "cd": 407256.63, "mc1": 265793.36, "ci": 2444.91, "mi": 263348.45}, {"cliente": "CERTISIGN", "rl": 661110.93, "cd": 645714.78, "mc1": 15396.16, "ci": 0.0, "mi": 15396.16}, {"cliente": "VIA VAREJO", "rl": 641313.24, "cd": 442184.21, "mc1": 199129.03, "ci": 8162.33, "mi": 190966.69}, {"cliente": "TIM", "rl": 623572.53, "cd": 397395.06, "mc1": 226177.47, "ci": 0.0, "mi": 226177.47}, {"cliente": "BANCO SANTANDER", "rl": 485594.34, "cd": 223987.29, "mc1": 261607.05, "ci": 805.99, "mi": 260801.06}, {"cliente": "ALLCARE", "rl": 478536.28, "cd": 387819.93, "mc1": 90716.34, "ci": 0.0, "mi": 90716.34}, {"cliente": "MERCADO LIVRE", "rl": 436184.86, "cd": 270551.01, "mc1": 165633.86, "ci": 563.2, "mi": 165070.66}, {"cliente": "DECOLAR", "rl": 433769.88, "cd": 360148.6, "mc1": 73621.28, "ci": 8712.5, "mi": 64908.77}, {"cliente": "MOVIDA", "rl": 419633.85, "cd": 435230.38, "mc1": -15596.53, "ci": 1931.73, "mi": -17528.26}, {"cliente": "OI", "rl": 385636.43, "cd": 448246.26, "mc1": -62609.82, "ci": 5390.29, "mi": -68000.12}, {"cliente": "ESPACO LASER", "rl": 340387.13, "cd": 359431.45, "mc1": -19044.32, "ci": 288.53, "mi": -19332.84}, {"cliente": "C&A PAY", "rl": 296328.6, "cd": 345228.76, "mc1": -48900.16, "ci": 0.0, "mi": -48900.16}, {"cliente": "ESTACIO DE SA", "rl": 288903.8, "cd": 190187.38, "mc1": 98716.42, "ci": 332.07, "mi": 98384.35}, {"cliente": "HCLTECH", "rl": 281120.0, "cd": 124242.56, "mc1": 156877.44, "ci": 94446.34, "mi": 62431.1}, {"cliente": "PETROBRAS", "rl": 252806.56, "cd": 240757.88, "mc1": 12048.68, "ci": 6237.27, "mi": 5811.41}, {"cliente": "BV FINANCEIRA", "rl": 238684.84, "cd": 229495.28, "mc1": 9189.56, "ci": 2414.26, "mi": 6775.3}, {"cliente": "SERASA EXPERIAN", "rl": 236618.16, "cd": 169498.58, "mc1": 67119.58, "ci": 285.9, "mi": 66833.68}, {"cliente": "CNP SEGUROS", "rl": 228441.82, "cd": 146227.07, "mc1": 82214.76, "ci": 2691.84, "mi": 79522.92}, {"cliente": "PRINCIPIA", "rl": 213066.0, "cd": 121831.42, "mc1": 91234.58, "ci": 208.68, "mi": 91025.9}, {"cliente": "CPFL", "rl": 201544.89, "cd": 263355.37, "mc1": -61810.47, "ci": 23791.22, "mi": -85601.69}, {"cliente": "GOL", "rl": 176260.35, "cd": 76637.56, "mc1": 99622.79, "ci": 1003.79, "mi": 98619.0}, {"cliente": "SKY", "rl": 174938.61, "cd": 127047.3, "mc1": 47891.31, "ci": 210.65, "mi": 47680.66}, {"cliente": "AUTO PASS", "rl": 171361.02, "cd": 24563.11, "mc1": 146797.92, "ci": 2559.42, "mi": 144238.5}, {"cliente": "BANCO DO BRASIL", "rl": 167865.53, "cd": 92739.47, "mc1": 75126.07, "ci": 3180.74, "mi": 71945.33}, {"cliente": "VIBRA", "rl": 165240.51, "cd": 37942.55, "mc1": 127297.96, "ci": 1420.29, "mi": 125877.67}, {"cliente": "SMILES", "rl": 134055.08, "cd": 44035.69, "mc1": 90019.4, "ci": 153.45, "mi": 89865.95}, {"cliente": "LIGGA TELECOM", "rl": 128436.56, "cd": 55204.94, "mc1": 73231.62, "ci": 133.65, "mi": 73097.97}, {"cliente": "PREFEITURA FORTALEZA", "rl": 121392.89, "cd": 105631.15, "mc1": 15761.74, "ci": 143.71, "mi": 15618.03}, {"cliente": "MULTILASER", "rl": 107789.07, "cd": 96118.86, "mc1": 11670.21, "ci": 2172.08, "mi": 9498.14}, {"cliente": "BLACK ROCK", "rl": 102795.0, "cd": 65308.49, "mc1": 37486.51, "ci": 218.59, "mi": 37267.92}, {"cliente": "AEGEA", "rl": 93959.35, "cd": 90860.08, "mc1": 3099.28, "ci": 985.89, "mi": 2113.39}, {"cliente": "RODOBENS", "rl": 86715.0, "cd": 57221.93, "mc1": 29493.07, "ci": 867.15, "mi": 28625.91}, {"cliente": "SISTEMA PREVER", "rl": 84915.0, "cd": 49204.21, "mc1": 35710.79, "ci": 400.37, "mi": 35310.42}, {"cliente": "CNU", "rl": 83024.53, "cd": 28423.31, "mc1": 54601.22, "ci": 0.0, "mi": 54601.22}, {"cliente": "CREMESP", "rl": 74760.0, "cd": 93468.65, "mc1": -18708.65, "ci": 156.29, "mi": -18864.93}, {"cliente": "BB SEGUROS", "rl": 73825.5, "cd": 33849.19, "mc1": 39976.31, "ci": 26.9, "mi": 39949.4}, {"cliente": "GRUPO SERVICES", "rl": 72346.74, "cd": 28442.81, "mc1": 43903.93, "ci": 80.42, "mi": 43823.51}, {"cliente": "RIACHUELO", "rl": 61026.21, "cd": 22411.41, "mc1": 38614.81, "ci": 3200.05, "mi": 35414.76}, {"cliente": "PULSE CLIENT EXPERT", "rl": 58497.0, "cd": 21555.97, "mc1": 36941.03, "ci": 1105.51, "mi": 35835.52}, {"cliente": "UNIMED FORTALEZA", "rl": 56360.14, "cd": 54984.67, "mc1": 1375.48, "ci": 1167.17, "mi": 208.31}, {"cliente": "LOCALIZA", "rl": 52514.08, "cd": 27103.14, "mc1": 25410.94, "ci": 115.29, "mi": 25295.66}, {"cliente": "NUBANK", "rl": 49321.75, "cd": 34535.92, "mc1": 14785.83, "ci": 0.0, "mi": 14785.83}, {"cliente": "ENS", "rl": 48854.43, "cd": 30983.8, "mc1": 17870.63, "ci": 0.0, "mi": 17870.63}, {"cliente": "ARCO EDUCACAO", "rl": 48624.43, "cd": 48590.07, "mc1": 34.36, "ci": 965.05, "mi": -930.69}, {"cliente": "ICOLABORA", "rl": 46232.52, "cd": 8926.13, "mc1": 37306.39, "ci": 51.45, "mi": 37254.94}, {"cliente": "ALELO", "rl": 44341.33, "cd": 17579.71, "mc1": 26761.61, "ci": 46.78, "mi": 26714.83}, {"cliente": "VOXLINE", "rl": 42960.56, "cd": 3186.89, "mc1": 39773.67, "ci": 104.93, "mi": 39668.74}, {"cliente": "ICONIC", "rl": 39868.5, "cd": 22189.62, "mc1": 17678.88, "ci": 798.18, "mi": 16880.69}, {"cliente": "CVC CORP", "rl": 39627.0, "cd": 14531.93, "mc1": 25095.07, "ci": 246.24, "mi": 24848.83}, {"cliente": "RECLAME AQUI", "rl": 36176.36, "cd": 41557.7, "mc1": -5381.33, "ci": 40.26, "mi": -5421.59}, {"cliente": "ZE DELIVERY", "rl": 36154.12, "cd": 22166.67, "mc1": 13987.45, "ci": 42.25, "mi": 13945.2}, {"cliente": "ALFA", "rl": 35518.48, "cd": 14543.32, "mc1": 20975.16, "ci": 71.05, "mi": 20904.11}, {"cliente": "PORTUGAL TELECOM", "rl": 35054.36, "cd": 12906.27, "mc1": 22148.08, "ci": 548.92, "mi": 21599.16}, {"cliente": "QUALICORP", "rl": 32753.35, "cd": 16873.6, "mc1": 15879.75, "ci": 35.55, "mi": 15844.2}, {"cliente": "MARY KAY", "rl": 31484.76, "cd": 20199.28, "mc1": 11285.48, "ci": 747.05, "mi": 10538.43}, {"cliente": "MERCADO PAGO", "rl": 27292.29, "cd": 39710.05, "mc1": -12417.76, "ci": 55.16, "mi": -12472.92}, {"cliente": "GRUPO AQUI VOCE PODE", "rl": 26415.62, "cd": 4447.54, "mc1": 21968.08, "ci": 46.87, "mi": 21921.2}, {"cliente": "ELO", "rl": 25474.5, "cd": 9341.95, "mc1": 16132.55, "ci": 150.0, "mi": 15982.55}, {"cliente": "VIASAT", "rl": 21784.41, "cd": 22859.39, "mc1": -1074.98, "ci": 31.77, "mi": -1106.76}, {"cliente": "BANCO SAFRA", "rl": 20896.85, "cd": 11313.32, "mc1": 9583.53, "ci": 23.92, "mi": 9559.61}, {"cliente": "VOCALCOM", "rl": 20177.05, "cd": 7432.99, "mc1": 12744.06, "ci": 361.22, "mi": 12382.84}, {"cliente": "YOUSE", "rl": 20034.35, "cd": 6488.76, "mc1": 13545.59, "ci": 22.88, "mi": 13522.71}, {"cliente": "BANCO NEON", "rl": 19358.21, "cd": 11012.44, "mc1": 8345.77, "ci": 0.0, "mi": 8345.77}, {"cliente": "BANCO PAN", "rl": 18788.58, "cd": 10943.14, "mc1": 7845.44, "ci": 20.59, "mi": 7824.84}, {"cliente": "QUALICORP ADM", "rl": 15096.0, "cd": 9290.7, "mc1": 5805.3, "ci": 280.59, "mi": 5524.7}, {"cliente": "LINKEDBY", "rl": 14581.61, "cd": 3446.99, "mc1": 11134.63, "ci": 275.98, "mi": 10858.65}, {"cliente": "SERCOM", "rl": 14494.99, "cd": 5346.22, "mc1": 9148.77, "ci": 312.97, "mi": 8835.8}, {"cliente": "CSU", "rl": 14246.99, "cd": 5248.65, "mc1": 8998.34, "ci": 263.09, "mi": 8735.25}, {"cliente": "VERMONT", "rl": 13680.75, "cd": 5016.98, "mc1": 8663.77, "ci": 106.21, "mi": 8557.56}, {"cliente": "UNIMED SEGUROS", "rl": 13671.93, "cd": 5037.68, "mc1": 8634.25, "ci": 256.59, "mi": 8377.66}, {"cliente": "UNIDAS", "rl": 11322.0, "cd": 4174.79, "mc1": 7147.21, "ci": 226.39, "mi": 6920.82}, {"cliente": "PORTO SEGURO", "rl": 11322.0, "cd": 4560.48, "mc1": 6761.52, "ci": 1590.16, "mi": 5171.36}, {"cliente": "VALE", "rl": 10692.75, "cd": 7174.66, "mc1": 3518.09, "ci": 240.97, "mi": 3277.13}, {"cliente": "ICOMON", "rl": 10279.5, "cd": 1794.86, "mc1": 8484.64, "ci": 11.44, "mi": 8473.2}, {"cliente": "BANCO INTER", "rl": 10095.91, "cd": 15591.83, "mc1": -5495.92, "ci": 159.77, "mi": -5655.7}, {"cliente": "ARLEQUIM", "rl": 9983.16, "cd": 5798.71, "mc1": 4184.46, "ci": 198.71, "mi": 3985.75}, {"cliente": "PROXXIMA TELECOMUNICAÇÕES", "rl": 9906.75, "cd": 3650.41, "mc1": 6256.34, "ci": 181.28, "mi": 6075.06}, {"cliente": "GAS FENOSA", "rl": 9642.17, "cd": 5271.22, "mc1": 4370.95, "ci": 10.73, "mi": 4360.22}, {"cliente": "XS3 SEGUROS", "rl": 9435.0, "cd": 3478.26, "mc1": 5956.74, "ci": 185.27, "mi": 5771.46}, {"cliente": "BRASPRESS TRANSPORTES", "rl": 9224.25, "cd": 278.05, "mc1": 8946.2, "ci": 10.92, "mi": 8935.28}, {"cliente": "CLIENTES MASSIVO", "rl": 8785.0, "cd": 18896.59, "mc1": -10111.59, "ci": 10.4, "mi": -10121.99}, {"cliente": "UNIMED CUIABA", "rl": 8491.5, "cd": 3129.21, "mc1": 5362.29, "ci": 161.03, "mi": 5201.26}, {"cliente": "INFOGLOBO", "rl": 7566.95, "cd": 2788.18, "mc1": 4778.76, "ci": 142.01, "mi": 4636.75}, {"cliente": "TIVIT", "rl": 6703.69, "cd": 2470.1, "mc1": 4233.59, "ci": 123.92, "mi": 4109.67}, {"cliente": "SOLLO", "rl": 6352.04, "cd": 2340.53, "mc1": 4011.51, "ci": 119.21, "mi": 3892.3}, {"cliente": "CASSI", "rl": 5661.0, "cd": 2085.9, "mc1": 3575.1, "ci": 106.24, "mi": 3468.86}, {"cliente": "CONEXAO CONT CENTER", "rl": 4918.3, "cd": 1813.46, "mc1": 3104.83, "ci": 98.01, "mi": 3006.83}, {"cliente": "SULAMERICA", "rl": 4903.68, "cd": 1806.85, "mc1": 3096.83, "ci": 92.03, "mi": 3004.8}, {"cliente": "SENNE LIQUOR DIAG", "rl": 4808.91, "cd": 1243.35, "mc1": 3565.56, "ci": 5.69, "mi": 3559.87}, {"cliente": "HAVANNA CAFE", "rl": 4612.12, "cd": 163.08, "mc1": 4449.05, "ci": 5.46, "mi": 4443.59}, {"cliente": "RUBY ROSE", "rl": 4563.81, "cd": 2207.93, "mc1": 2355.88, "ci": 16.81, "mi": 2339.06}, {"cliente": "GRUPO DDM", "rl": 4350.33, "cd": 1213.88, "mc1": 3136.45, "ci": 5.15, "mi": 3131.3}, {"cliente": "BENENUTRI", "rl": 4254.58, "cd": 592.3, "mc1": 3662.27, "ci": 5.04, "mi": 3657.24}, {"cliente": "BENNER", "rl": 4245.75, "cd": 1564.43, "mc1": 2681.32, "ci": 79.68, "mi": 2601.64}, {"cliente": "TELLUS", "rl": 4104.23, "cd": 1512.28, "mc1": 2591.95, "ci": 77.03, "mi": 2514.92}, {"cliente": "NISSAN", "rl": 3953.25, "cd": 3575.55, "mc1": 377.7, "ci": 45.0, "mi": 332.7}, {"cliente": "CARREFOUR", "rl": 3919.7, "cd": 1444.29, "mc1": 2475.42, "ci": 73.56, "mi": 2401.85}, {"cliente": "ODONTOPREV", "rl": 3537.46, "cd": 1303.14, "mc1": 2234.32, "ci": 63.12, "mi": 2171.19}, {"cliente": "AUDAC", "rl": 2782.89, "cd": 1025.41, "mc1": 1757.48, "ci": 52.23, "mi": 1705.25}, {"cliente": "CEMAR", "rl": 2488.64, "cd": 916.99, "mc1": 1571.65, "ci": 46.71, "mi": 1524.95}, {"cliente": "MOTOROLA", "rl": 2326.27, "cd": 70.12, "mc1": 2256.15, "ci": 2.75, "mi": 2253.39}, {"cliente": "HUSQVARNA", "rl": 2224.11, "cd": 72.19, "mc1": 2151.92, "ci": 2.48, "mi": 2149.45}, {"cliente": "HI PLATAFORM", "rl": 2130.66, "cd": 93.14, "mc1": 2037.52, "ci": 2.18, "mi": 2035.34}, {"cliente": "DATAMETRICA", "rl": 1887.0, "cd": 695.15, "mc1": 1191.85, "ci": 34.7, "mi": 1157.15}, {"cliente": "ALERT", "rl": 1273.72, "cd": 469.99, "mc1": 803.74, "ci": 26.98, "mi": 776.76}, {"cliente": "VIA NOVA BENEFICIOS", "rl": 1059.47, "cd": 31.94, "mc1": 1027.54, "ci": 1.25, "mi": 1026.28}, {"cliente": "NEOBPO", "rl": 1054.2, "cd": 56.52, "mc1": 997.68, "ci": 2.17, "mi": 995.51}, {"cliente": "FUNDACAO CESP", "rl": 653.35, "cd": 240.68, "mc1": 412.67, "ci": 33414.5, "mi": -33001.83}, {"cliente": "AFFERO LAB", "rl": 0.0, "cd": 2055.11, "mc1": -2055.11, "ci": 2.37, "mi": -2057.49}, {"cliente": "GIMBA", "rl": 0.0, "cd": 75406.85, "mc1": -75406.85, "ci": 1838.71, "mi": -77245.55}, {"cliente": "BRASILSEG", "rl": 0.0, "cd": 24001.09, "mc1": -24001.09, "ci": 0.0, "mi": -24001.09}, {"cliente": "ATENTO", "rl": 0.0, "cd": 172036.54, "mc1": -172036.54, "ci": 703.62, "mi": -172740.16}, {"cliente": "AZUL", "rl": 0.0, "cd": 4669.88, "mc1": -4669.88, "ci": 3805.9, "mi": -8475.78}, {"cliente": "BANCO BRADESCO", "rl": 0.0, "cd": 109510.45, "mc1": -109510.45, "ci": 0.0, "mi": -109510.45}, {"cliente": "BANCO VOTORANTIM", "rl": 0.0, "cd": 48.43, "mc1": -48.43, "ci": 0.0, "mi": -48.43}, {"cliente": "PRIMO ROSSI", "rl": 0.0, "cd": 11.01, "mc1": -11.01, "ci": 118.02, "mi": -129.03}, {"cliente": "CAIXA ECON FEDERAL", "rl": 0.0, "cd": 1122.72, "mc1": -1122.72, "ci": 0.0, "mi": -1122.72}, {"cliente": "NAO ALOCADO", "rl": 0.0, "cd": 337415.6, "mc1": -337415.6, "ci": 2256050.35, "mi": -2593465.95}, {"cliente": "FEMME", "rl": 0.0, "cd": 28655.36, "mc1": -28655.36, "ci": 84.61, "mi": -28739.97}, {"cliente": "GRANITO PAGAMENTO", "rl": 0.0, "cd": 24.0, "mc1": -24.0, "ci": 92.48, "mi": -116.48}, {"cliente": "99APP", "rl": 0.0, "cd": 12375.81, "mc1": -12375.81, "ci": 0.0, "mi": -12375.81}], "bus": [{"bu": "MUTANT", "rl": 15419824.37, "cd": 9403618.62, "mc1": 6016205.75, "ci": 1774929.0, "mi": 4241276.75}, {"bu": "INTERAXA", "rl": 7474776.26, "cd": 6489733.34, "mc1": 985042.92, "ci": 813911.28, "mi": 171131.64}], "trend": [{"mes": "Jan", "rl": 25603249.33, "mc1": 7939724.43, "mi": 4766060.94, "mc1p": 0.3101, "mip": 0.1862}, {"mes": "Fev", "rl": 24348228.76, "mc1": 8002666.27, "mi": 4871997.99, "mc1p": 0.3287, "mip": 0.2001}, {"mes": "Mar", "rl": 23631349.34, "mc1": 6249200.6, "mi": 3117985.37, "mc1p": 0.2644, "mip": 0.1319}, {"mes": "Abr", "rl": 22894600.63, "mc1": 7001248.66, "mi": 4412408.39, "mc1p": 0.3058, "mip": 0.1927}], "kpi": {"rl": 22894600.63, "cd": 15893351.96, "ci": 2588840.27, "mc1": 7001248.66, "mi": 4412408.39, "mc1p": 0.3058, "mip": 0.1927, "n": 116, "nneg": 27}};
+const fmt = n => (n<0?"-":"")+"R$ "+Math.abs(Math.round(n)).toLocaleString("pt-BR");
+const fmtM = n => "R$ "+(n/1e6).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1})+"M";
+const pct = n => (n*100).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1})+"%";
+let filter="all", sortKey="rl", sortDir=-1;
+
+document.getElementById("sub").textContent = "Mês de referência: "+D.ref+"  ·  "+D.kpi.n+" clientes ativos  ·  "+D.kpi.nneg+" com margem indireta negativa";
+
+const k=D.kpi;
+const cards=[
+ {l:"Faturamento (RL)",v:fmtM(k.rl),c:"blue"},
+ {l:"Custo Direto",v:fmtM(k.cd),c:""},
+ {l:"Margem Direta (MC1)",v:fmtM(k.mc1),c:"ok"},
+ {l:"MC1 %",v:pct(k.mc1p),c:"ok"},
+ {l:"Margem Indireta (MI)",v:fmtM(k.mi),c:"ok"},
+ {l:"MI %",v:pct(k.mip),c:"warn"}
+];
+document.getElementById("kpis").innerHTML=cards.map(c=>`<div class="kpi ${c.c}"><div class="v">${c.v}</div><div class="l">${c.l}</div></div>`).join("");
+
+// Top 12 chart
+const top=D.clients.slice(0,12);
+new Chart(document.getElementById("chTop"),{type:"bar",data:{labels:top.map(c=>c.cliente),
+ datasets:[
+  {label:"Faturamento RL",data:top.map(c=>c.rl),backgroundColor:"#93c5fd"},
+  {label:"Margem Indireta",data:top.map(c=>c.mi),backgroundColor:top.map(c=>c.mi<0?"#fca5a5":"#86efac")}
+ ]},
+ options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"top"},
+  tooltip:{callbacks:{label:c=>c.dataset.label+": "+fmt(c.raw)}}},
+  scales:{y:{ticks:{callback:v=>(v/1e6)+"M"}},x:{ticks:{font:{size:9},maxRotation:60,minRotation:45}}}}});
+
+// BU doughnut
+new Chart(document.getElementById("chBu"),{type:"doughnut",data:{labels:D.bus.map(b=>b.bu),
+ datasets:[{data:D.bus.map(b=>b.rl),backgroundColor:["#2563eb","#f59e0b","#10b981","#ef4444"]}]},
+ options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"bottom"},
+  tooltip:{callbacks:{label:c=>c.label+": "+fmt(c.raw)}}}}});
+
+// Trend
+new Chart(document.getElementById("chTrend"),{data:{labels:D.trend.map(t=>t.mes),
+ datasets:[
+  {type:"bar",label:"Faturamento RL",data:D.trend.map(t=>t.rl),backgroundColor:"#bfdbfe",order:2,yAxisID:"y"},
+  {type:"bar",label:"Margem Indireta",data:D.trend.map(t=>t.mi),backgroundColor:"#86efac",order:2,yAxisID:"y"},
+  {type:"line",label:"MI %",data:D.trend.map(t=>t.mip*100),borderColor:"#d97706",backgroundColor:"#d97706",order:1,yAxisID:"y1",tension:.3,pointRadius:4}
+ ]},
+ options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:"top"},
+  tooltip:{callbacks:{label:c=>c.dataset.label.includes("%")?c.dataset.label+": "+c.raw.toFixed(1)+"%":c.dataset.label+": "+fmt(c.raw)}}},
+  scales:{y:{position:"left",ticks:{callback:v=>(v/1e6)+"M"}},y1:{position:"right",grid:{drawOnChartArea:false},ticks:{callback:v=>v+"%"}}}}});
+
+function setF(b){filter=b.dataset.f;document.querySelectorAll(".fbtn").forEach(x=>x.classList.remove("active"));b.classList.add("active");render();}
+function sortBy(k){if(sortKey===k)sortDir*=-1;else{sortKey=k;sortDir=-1;}render();}
+function render(){
+ const q=document.getElementById("search").value.toLowerCase();
+ let rows=D.clients.map(c=>({...c,mc1p:c.rl?c.mc1/c.rl:0,mip:c.rl?c.mi/c.rl:0}));
+ if(filter==="neg")rows=rows.filter(c=>c.mi<0);
+ if(q)rows=rows.filter(c=>c.cliente.toLowerCase().includes(q));
+ rows.sort((a,b)=>(a[sortKey]-b[sortKey])*sortDir);
+ const tb=document.getElementById("rows");
+ tb.innerHTML=rows.map(c=>`<tr class="${c.mi<0?'neg':''}">
+  <td class="cli">${c.cliente}</td>
+  <td class="num">${fmt(c.rl)}</td>
+  <td class="num">${fmt(c.cd)}</td>
+  <td class="num">${fmt(c.mc1)}</td>
+  <td class="num">${pct(c.mc1p)}</td>
+  <td class="num">${fmt(c.ci)}</td>
+  <td class="num ${c.mi<0?'negv':'pos'}">${fmt(c.mi)}</td>
+  <td class="num ${c.mi<0?'negv':'pos'}">${pct(c.mip)}</td></tr>`).join("");
+ const sum=k=>rows.reduce((a,c)=>a+c[k],0);
+ const trl=sum("rl"),tcd=sum("cd"),tmc1=sum("mc1"),tci=sum("ci"),tmi=sum("mi");
+ tb.innerHTML+=`<tr class="total"><td>TOTAL (${rows.length})</td>
+  <td class="num">${fmt(trl)}</td><td class="num">${fmt(tcd)}</td><td class="num">${fmt(tmc1)}</td>
+  <td class="num">${trl?pct(tmc1/trl):'-'}</td><td class="num">${fmt(tci)}</td>
+  <td class="num">${fmt(tmi)}</td><td class="num">${trl?pct(tmi/trl):'-'}</td></tr>`;
+}
+render();
+</script>
+</body>
+</html>
